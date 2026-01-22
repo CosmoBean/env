@@ -1,0 +1,130 @@
+// Link/ append this file to
+// /Users/vp/Library/Application\ Support/Cursor/User/keybindings.json
+// Can also find this file with
+// "Cmd + Shift + p" followed by "Preferences: Open keyboard shortcuts (JSON)"
+
+// Link to ~/Library/Application\ Support/Cursor/User/keybindings.json
+
+// Place your key bindings in this file to override the defaults
+[
+    {
+        "key": "ctrl+p",
+        "command": "workbench.action.previousEditor",
+        "when": "editorTextFocus && neovim.mode == 'normal'"
+    },
+
+    {
+        "key": "ctrl+n",
+        "command": "workbench.action.nextEditor",
+        "when": "editorTextFocus && neovim.mode == 'normal'"
+    },
+    
+    // for experimentation
+
+    // {
+    //     "key": "ctrl+b",
+    //     // "command": "workbench.action.showAllSymbols", // puts "#" in search window
+    //     "command": "workbench.action.quickOpen",
+    //     // "when": "editorTextFocus",
+    // },
+    
+    //========================================//
+    // tmux type keybindings C-s + (hjkl)
+    //========================================//
+
+    //===============//
+    // up/ down from terminal
+    //===============//
+
+    {
+        "key": "ctrl+g j",
+        "command": "workbench.action.focusActiveEditorGroup",
+        "when": "terminalFocus"
+    },
+
+    {
+        "key": "ctrl+g k",
+        "command": "workbench.action.focusActiveEditorGroup",
+        "when": "terminalFocus"
+    },
+
+    // resize terminal window
+    {
+        "key": "ctrl+g shift+j",
+        "command": "workbench.action.terminal.resizePaneDown",
+        "when": "terminalFocus || editorFocus"
+    },
+
+    {
+        "key": "ctrl+g shift+k",
+        "command": "workbench.action.terminal.resizePaneUp",
+        "when": "terminalFocus || editorFocus"
+    },
+
+    //===============//
+    // up/down from editor
+    //===============//
+
+    {
+        "key": "ctrl+g j",
+        "command": "workbench.action.terminal.focus",
+        "when": "editorTextFocus"
+    },
+
+    {
+        "key": "ctrl+g k",
+        "command": "workbench.action.terminal.focus",
+        "when": "editorTextFocus"
+    },
+
+    //===============//
+    // left from terminal
+    //===============//
+
+    {
+        "key": "ctrl+g h",
+        "command": "workbench.view.explorer",
+        "when": "terminalFocus"
+    },
+
+    //===============//
+    // left from editor
+    //===============//
+
+    {
+        "key": "ctrl+g h",
+        "command": "workbench.view.explorer",
+        "when": "editorTextFocus"
+    },
+
+    //===============//
+    // right from sidebar
+    //===============//
+
+    {
+        "key": "ctrl+g l",
+        "command": "workbench.action.focusActiveEditorGroup",
+        "when": "explorerViewletVisible"
+    },
+    
+    //===============//
+    // right from editor
+    //===============//
+    
+    // hit the SecondarySideBar
+
+    // {
+    //     "key": "ctrl+g l",
+    //     "command": "workbench.action.compareEditor.focusSecondarySide",
+    //     // "when": "editorTextFocus"
+    // },
+
+    //===============//
+    // right from terminal
+    //===============//
+
+    //===============//
+    // left from chat window
+    //===============//
+
+]
