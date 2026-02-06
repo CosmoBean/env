@@ -71,6 +71,8 @@
     "files.useExperimentalFileWatcher": true,
     // use exec server for ssh
     "remote.SSH.useExecServer": true,
+    // increase SSH connection timeout (seconds)
+    "remote.SSH.connectTimeout": 180,
     // auto reload
     "files.autoReload": "afterDelay",
 
@@ -112,6 +114,9 @@
         "**/wandb",
         "**/cpkt*",
         "**/data",
-    ]
+    ],
+    "remote.SSH.remotePlatform": {
+        "orchard": "linux"
+    }
 
 }
