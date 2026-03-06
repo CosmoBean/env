@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Script to set up Neovim for use with Cursor/VSCode
 # This script will:
@@ -8,7 +8,7 @@
 # 4. Install the vscode-neovim extension in Cursor
 # 5. Configure Cursor settings for Neovim
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -17,11 +17,48 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+detect_os() {
+    case "$(uname -s)" in
+        Linux)
+            printf 'linux\n'
+            ;;
+        Darwin)
+            printf 'macos\n'
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+get_cursor_user_dir() {
+    case "$1" in
+        linux)
+            printf '%s\n' "$HOME/.config/Cursor/User"
+            ;;
+        macos)
+            printf '%s\n' "$HOME/Library/Application Support/Cursor/User"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+OS_NAME="$(detect_os)"
+if [ "$OS_NAME" = "macos" ]; then
+    CURSOR_OS_KEY="darwin"
+    EXTENSIONS_SHORTCUT="Cmd+Shift+X"
+else
+    CURSOR_OS_KEY="linux"
+    EXTENSIONS_SHORTCUT="Ctrl+Shift+X"
+fi
+
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NVIM_CONFIG_SRC="$SCRIPT_DIR/nvim"
 NVIM_CONFIG_TARGET="$HOME/.config/nvim"
-CURSOR_USER_DIR="$HOME/Library/Application Support/Cursor/User"
+CURSOR_USER_DIR="${CURSOR_USER_DIR:-$(get_cursor_user_dir "$OS_NAME")}"
 CURSOR_SETTINGS="$CURSOR_USER_DIR/settings.json"
 
 echo -e "${BLUE}========================================${NC}"
@@ -32,13 +69,14 @@ echo ""
 # Step 1: Check if Neovim is installed
 echo -e "${GREEN}Step 1: Checking Neovim installation...${NC}"
 if command -v nvim &> /dev/null; then
-    NVIM_VERSION=$(nvim --version | head -1)
+    NVIM_PATH="$(command -v nvim)"
+    NVIM_VERSION="$("$NVIM_PATH" --version | head -1)"
     echo -e "${GREEN}✓ Neovim is installed: $NVIM_VERSION${NC}"
 else
     echo -e "${YELLOW}⚠ Neovim is not installed${NC}"
     
     # Check if we're on macOS
-    if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [ "$OS_NAME" = "macos" ]; then
         echo -e "${YELLOW}Installing Neovim via Homebrew...${NC}"
         
         if ! command -v brew &> /dev/null; then
@@ -51,6 +89,7 @@ else
         fi
         
         brew install neovim
+        NVIM_PATH="$(command -v nvim)"
         echo -e "${GREEN}✓ Neovim installed successfully${NC}"
     else
         echo -e "${RED}Error: Neovim is not installed.${NC}"
@@ -75,23 +114,26 @@ fi
 mkdir -p "$HOME/.config"
 
 # Backup existing config if it exists
-if [ -d "$NVIM_CONFIG_TARGET" ] || [ -L "$NVIM_CONFIG_TARGET" ]; then
-    BACKUP_DIR="$NVIM_CONFIG_TARGET.backup.$(date +%Y%m%d_%H%M%S)"
-    echo -e "${YELLOW}⚠ Existing Neovim config found. Backing up to: $BACKUP_DIR${NC}"
-    mv "$NVIM_CONFIG_TARGET" "$BACKUP_DIR"
-fi
+if [ -L "$NVIM_CONFIG_TARGET" ] && [ "$(readlink "$NVIM_CONFIG_TARGET")" = "$NVIM_CONFIG_SRC" ]; then
+    echo -e "${GREEN}✓ Neovim config already linked${NC}"
+else
+    if [ -d "$NVIM_CONFIG_TARGET" ] || [ -L "$NVIM_CONFIG_TARGET" ]; then
+        BACKUP_DIR="$NVIM_CONFIG_TARGET.backup.$(date +%Y%m%d_%H%M%S)"
+        echo -e "${YELLOW}⚠ Existing Neovim config found. Backing up to: $BACKUP_DIR${NC}"
+        mv "$NVIM_CONFIG_TARGET" "$BACKUP_DIR"
+    fi
 
-# Create symlink to your Neovim config
-echo -e "${GREEN}Creating symlink: $NVIM_CONFIG_TARGET -> $NVIM_CONFIG_SRC${NC}"
-ln -sf "$NVIM_CONFIG_SRC" "$NVIM_CONFIG_TARGET"
-echo -e "${GREEN}✓ Neovim config linked successfully${NC}"
+    echo -e "${GREEN}Creating symlink: $NVIM_CONFIG_TARGET -> $NVIM_CONFIG_SRC${NC}"
+    ln -s "$NVIM_CONFIG_SRC" "$NVIM_CONFIG_TARGET"
+    echo -e "${GREEN}✓ Neovim config linked successfully${NC}"
+fi
 
 # Step 3: Check/Update Cursor settings
 echo ""
 echo -e "${GREEN}Step 3: Configuring Cursor settings...${NC}"
 
 # Get Neovim path
-NVIM_PATH=$(which nvim)
+NVIM_PATH="${NVIM_PATH:-$(command -v nvim || true)}"
 if [ -z "$NVIM_PATH" ]; then
     echo -e "${RED}Error: Could not find Neovim path${NC}"
     exit 1
@@ -107,43 +149,88 @@ fi
 # Update settings.json with Neovim configuration
 echo -e "${GREEN}Updating Cursor settings for Neovim...${NC}"
 
-python3 << EOF
+if ! command -v python3 >/dev/null 2>&1; then
+    echo -e "${RED}Error: python3 is required to update Cursor settings.${NC}"
+    exit 1
+fi
+
+python3 - "$CURSOR_SETTINGS" "$NVIM_PATH" "$CURSOR_OS_KEY" <<'EOF'
 import json
-import os
+import re
+import sys
+from pathlib import Path
 
-settings_file = "$CURSOR_SETTINGS"
-nvim_path = "$NVIM_PATH"
+def strip_jsonc(text):
+    result = []
+    in_string = False
+    escaped = False
+    i = 0
 
-# Read existing settings
-with open(settings_file, 'r') as f:
-    settings = json.load(f)
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
 
-# Add/update Neovim settings
-settings["vscode-neovim.neovimExecutablePaths.darwin"] = nvim_path
-settings["vscode-neovim.neovimInitVimPaths.darwin"] = os.path.expanduser("~/.config/nvim/init.lua")
+        if in_string:
+            result.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
 
-# Ensure extension affinity is set
+        if ch == '"':
+            in_string = True
+            result.append(ch)
+            i += 1
+            continue
+
+        if ch == "/" and nxt == "/":
+            while i < len(text) and text[i] != "\n":
+                i += 1
+            continue
+
+        if ch == "/" and nxt == "*":
+            i += 2
+            while i + 1 < len(text) and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+
+        result.append(ch)
+        i += 1
+
+    return re.sub(r",(\s*[}\]])", r"\1", "".join(result))
+
+def load_jsonc(path):
+    file_path = Path(path)
+    raw = file_path.read_text(encoding="utf-8")
+    if not raw.strip():
+        return {}
+    cleaned = strip_jsonc(raw)
+    if not cleaned.strip():
+        return {}
+    return json.loads(cleaned)
+
+settings_file, nvim_path, os_key = sys.argv[1:4]
+settings = load_jsonc(settings_file)
+
+settings[f"vscode-neovim.neovimExecutablePaths.{os_key}"] = nvim_path
+settings[f"vscode-neovim.neovimInitVimPaths.{os_key}"] = str(Path.home() / ".config" / "nvim" / "init.lua")
+
 if "extensions.experimental.affinity" not in settings:
     settings["extensions.experimental.affinity"] = {}
 settings["extensions.experimental.affinity"]["asvetliakov.vscode-neovim"] = 1
 
-# Ensure compositeKeys is set
 if "vscode-neovim.compositeKeys" not in settings:
     settings["vscode-neovim.compositeKeys"] = {}
 
-# Write back
-with open(settings_file, 'w') as f:
-    json.dump(settings, f, indent=4)
-
+Path(settings_file).write_text(json.dumps(settings, indent=4) + "\n", encoding="utf-8")
 print("✓ Cursor settings updated")
 EOF
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Cursor settings configured${NC}"
-else
-    echo -e "${RED}Error updating Cursor settings${NC}"
-    exit 1
-fi
+echo -e "${GREEN}✓ Cursor settings configured${NC}"
 
 # Step 4: Install extension instructions
 echo ""
@@ -152,7 +239,7 @@ echo -e "${YELLOW}You need to install the extension manually:${NC}"
 echo ""
 echo -e "${BLUE}Option 1: Via Cursor UI${NC}"
 echo "  1. Open Cursor"
-echo "  2. Press Cmd+Shift+X (or View > Extensions)"
+echo "  2. Press $EXTENSIONS_SHORTCUT (or View > Extensions)"
 echo "  3. Search for 'vscode-neovim'"
 echo "  4. Click Install on 'asvetliakov.vscode-neovim'"
 echo ""
@@ -179,7 +266,7 @@ else
 fi
 
 # Check Cursor settings
-if grep -q "vscode-neovim.neovimExecutablePaths" "$CURSOR_SETTINGS" 2>/dev/null; then
+if grep -q "vscode-neovim.neovimExecutablePaths.$CURSOR_OS_KEY" "$CURSOR_SETTINGS" 2>/dev/null; then
     echo -e "${GREEN}✓ Cursor settings configured for Neovim${NC}"
 else
     echo -e "${YELLOW}⚠ Cursor settings might not be fully configured${NC}"
