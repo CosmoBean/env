@@ -23,10 +23,12 @@ Applies the repo dotfiles by backing up existing files and linking:
   tmux.conf -> ~/.tmux.conf
   vimrc     -> ~/.vimrc
   nvim/     -> ~/.config/nvim
+  bash/.bash_aliases -> ~/.bash_aliases (if present)
 
 If Bash dotfiles are added to the repo later, this script will also link the
 first matching file it finds for each target:
   .bashrc / bashrc / bash/.bashrc / bash/bashrc -> ~/.bashrc
+  .bash_aliases / bash_aliases / bash/.bash_aliases / bash/bash_aliases -> ~/.bash_aliases
   .bash_profile / bash_profile / bash/.bash_profile / bash/bash_profile -> ~/.bash_profile
   .profile / profile / bash/.profile / bash/profile -> ~/.profile
 
@@ -145,6 +147,11 @@ install_bash_configs() {
 
     if source="$(find_repo_source ".bashrc" "bashrc" "bash/.bashrc" "bash/bashrc")"; then
         link_item "$source" "$HOME/.bashrc"
+        installed=true
+    fi
+
+    if source="$(find_repo_source ".bash_aliases" "bash_aliases" "bash/.bash_aliases" "bash/bash_aliases")"; then
+        link_item "$source" "$HOME/.bash_aliases"
         installed=true
     fi
 
